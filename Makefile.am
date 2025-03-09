@@ -79,12 +79,15 @@ EXTRA_DIST = \
 	.ci/osx-prepare.sh \
 	.ci/ovn-kubernetes/prepare.sh \
 	.ci/ovn-kubernetes/custom.patch \
-	.github/workflows/containers.yml \
-	.github/workflows/test.yml \
-	.github/workflows/test-arm.yml \
-	.github/workflows/ovn-kubernetes.yml \
-	.github/workflows/ovn-fake-multinode-tests.yml \
-	.github/workflows/ovn-upgrade-tests.yml \
+	.github.orig/workflows/containers.yml \
+	.github.orig/workflows/test.yml \
+	.github.orig/workflows/test-arm.yml \
+	.github.orig/workflows/ovn-kubernetes.yml \
+	.github.orig/workflows/ovn-fake-multinode-tests.yml \
+	.github.orig/workflows/ovn-upgrade-tests.yml \
+	.github/FUNDING.yml \
+	.github/workflows/builds.yml \
+	.github/workflows/commits.yml \
 	.readthedocs.yaml \
 	boot.sh \
 	$(MAN_FRAGMENTS) \
