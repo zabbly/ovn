@@ -1,0 +1,97 @@
+name: Builds
+on:
+  - push
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-zfs:
+    name: Build OVN
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - debian-11
+          - debian-12
+          - debian-13
+        arch:
+          - amd64
+          - arm64
+        exclude:
+          - os: debian-11
+            arch: arm64
+    runs-on:
+      - self-hosted
+      - cpu-4
+      - mem-4G
+      - arch-${{ matrix.arch }}
+      - image-${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install --yes \
+            debhelper \
+            devscripts \
+            dh-autoreconf \
+            dpkg-dev \
+            equivs \
+            libssl-dev
+
+          sudo apt-get install --yes libxdp-dev || true
+
+      - name: Build OVN
+        env:
+          PKGOS: ${{ matrix.os }}
+          PKGARCH: ${{ matrix.arch }}
+        run: |
+            [ "${PKGOS}" = "debian-11" ] && CODENAME=bullseye
+            [ "${PKGOS}" = "debian-12" ] && CODENAME=bookworm
+            [ "${PKGOS}" = "debian-13" ] && CODENAME=trixie
+            [ "${PKGOS}" = "ubuntu-20.04" ] && CODENAME=focal
+            [ "${PKGOS}" = "ubuntu-22.04" ] && CODENAME=jammy
+            [ "${PKGOS}" = "ubuntu-24.04" ] && CODENAME=noble
+
+            cd ovs
+            ./boot.sh
+            ./configure --enable-ssl CFLAGS=-fPIC
+            sudo make install
+            cd ..
+
+            ./boot.sh
+            ./configure --enable-ssl
+            make debian
+            mk-build-deps --install --root-cmd sudo --remove debian/control -t "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes"
+            dpkg-checkbuilddeps
+
+            OVNVERSION=$(grep AC_INIT configure.ac | cut -d, -f2 | awk '{print $1}')
+
+            dch -D ${CODENAME} -M -b -m "Automated OVN build" -v 1:${OVNVERSION}-${PKGARCH}-$(echo ${PKGOS} | sed "s/-//g")-$(date -u +%Y%m%d%H%M)
+
+            make distclean
+            fakeroot debian/rules clean
+            DEB_BUILD_OPTIONS="nocheck" fakeroot debian/rules binary
+
+      - name: Prepare the artifacts
+        run: |
+          mkdir out/
+          mv ../ovn-* out/
+
+      - name: Upload resulting build
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: out/*
